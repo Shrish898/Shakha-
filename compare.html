@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compare · Shakha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Back to catalogue</a>
+    <div id="out"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="store.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const all = getAllRecords();
+    const a = all.find(r => r.id === params.get("a"));
+    const b = all.find(r => r.id === params.get("b"));
+    const out = document.getElementById("out");
+
+    if (!a || !b) {
+      out.innerHTML = "<div class='panel'><h2>Records not found</h2></div>";
+    } else {
+      const fields = [
+        ["Title", "title"],
+        ["Creator", "creator"],
+        ["Region", "region"],
+        ["Cultural context", "culturalContext"],
+        ["Reuse permission", "reusePermission"],
+        ["How to credit", "attributionText"]
+      ];
+
+      const rows = fields.map(([label, key]) => {
+        const oldVal = a[key] || "";
+        const newVal = b[key] || "";
+        const same = oldVal === newVal;
+        return `<div class="row"><b>${label}${same ? " · unchanged" : ""}</b>${diffHtml(oldVal, newVal)}</div>`;
+      }).join("");
+
+      out.innerHTML = `
+        <div class="certificate">
+          <div class="orn">✦ ✦ ✦</div>
+          <h1>What changed</h1>
+          <p class="sub">
+            <a href="credit.html?id=${a.id}">${esc(a.title)}</a> (${a.id}) →
+            <a href="credit.html?id=${b.id}">${esc(b.title)}</a> (${b.id})
+          </p>
+          <p class="diff-legend"><del>removed</del> <ins>added</ins> plain = unchanged</p>
+          <div class="rows">${rows}</div>
+          <div class="note">⚠️ Records state who says they created them. They do not prove legal ownership.</div>
+        </div>`;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shakha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1><span class="flame">🪔</span> Shakha</h1>
+      <p class="tagline">Every culture has a source. Credit it.</p>
+      <div class="rule"></div>
+    </header>
+
+    <section class="panel">
+      <h2>Add a record</h2>
+      <div class="form-grid">
+        <input id="f-title" placeholder="Title">
+        <input id="f-creator" placeholder="Creator">
+        <input id="f-region" placeholder="Region">
+        <input id="f-context" placeholder="Cultural context">
+        <select id="f-reuse">
+          <option>Free to reuse with credit</option>
+          <option>Reuse for non-commercial only</option>
+          <option>Ask the community first</option>
+          <option>Do not reuse</option>
+        </select>
+      </div>
+      <p class="hint-light">📸 Optional memory photo (only upload photos you took or have permission to share):</p>
+      <input type="file" id="f-photo" accept="image/*">
+      <div class="note">⚠️ This record states who says they created it. It does not prove legal ownership.</div>
+      <button id="add">Add record</button>
+    </section>
+
+    <div class="search"><input id="search" placeholder="Search title, creator, or ID..."></div>
+    <div class="cards" id="list"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="store.js"></script>
+  <script>
+    const list = document.getElementById("list");
+    const search = document.getElementById("search");
+
+    let allRecords = getAllRecords();
+
+    function show(items) {
+      list.innerHTML = "";
+      items.forEach((r, i) => {
+        const first = getPhotos(r.id)[0];
+        list.innerHTML += `<div class="card" style="animation-delay:${i * 0.08}s">
+          ${first ? `<img class="thumb" src="${first.src}" alt="${esc(first.caption)}">` : ""}
+          <h3>${esc(r.title)}</h3>
+          <p class="meta">${r.id} · ${esc(r.creator)} · ${esc(r.region)}</p>
+          <span class="tag">${esc(r.reusePermission)}</span>
+          ${r.forkedFrom ? `<span class="tag fork">🌳 Fork of ${r.forkedFrom}</span>` : ""}
+          ${r.flags.length ? `<span class="tag flagged">🚩 ${r.flags.length}</span>` : ""}
+          <p><a href="credit.html?id=${r.id}">View credit card →</a></p>
+        </div>`;
+      });
+    }
+
+    search.addEventListener("input", () => {
+      const text = search.value.toLowerCase();
+      const matches = allRecords.filter(r =>
+        r.title.toLowerCase().includes(text) ||
+        r.creator.toLowerCase().includes(text) ||
+        r.id.toLowerCase().includes(text)
+      );
+      show(matches);
+    });
+
+    document.getElementById("add").addEventListener("click", async () => {
+      const title = document.getElementById("f-title").value.trim();
+      const creator = document.getElementById("f-creator").value.trim();
+      const region = document.getElementById("f-region").value.trim();
+      const context = document.getElementById("f-context").value.trim();
+      const reuse = document.getElementById("f-reuse").value;
+      const file = document.getElementById("f-photo").files[0];
+
+      if (!title || !creator) {
+        alert("Title and creator are required.");
+        return;
+      }
+
+      const d = todayStr();
+      const newRecord = {
+        id: nextId(),
+        title: title,
+        creator: creator,
+        source: "Added by user",
+        region: region,
+        culturalContext: context,
+        reusePermission: reuse,
+        attributionText: "Credit: " + creator + (region ? ", " + region : ""),
+        createdDate: d,
+        forkedFrom: null,
+        flags: [],
+        history: [{ date: d, action: "Record created" }]
+      };
+
+      addRecord(newRecord);
+
+      if (file) {
+        try {
+          const src = await compressImage(file);
+          const err = addPhoto(newRecord.id, { src: src, caption: title, credit: creator, date: d });
+          if (err) alert("Record saved, but the photo was not: " + err);
+        } catch (e) {
+          alert("Record saved, but the photo was not: " + e.message);
+        }
+      }
+
+      ["f-title", "f-creator", "f-region", "f-context", "f-photo"].forEach(i => {
+        document.getElementById(i).value = "";
+      });
+      allRecords = getAllRecords();
+      show(allRecords);
+    });
+
+    show(allRecords);
+  </script>
+</body>
+</html>

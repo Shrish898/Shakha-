@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Credit Card · Shakha</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="index.html">← Back to catalogue</a>
+    <div id="card"></div>
+  </div>
+  <div id="lightbox" class="lightbox"></div>
+
+  <script src="data.js"></script>
+  <script src="store.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get("id");
+    const card = document.getElementById("card");
+    const lightbox = document.getElementById("lightbox");
+
+    lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
+
+    function render() {
+      const all = getAllRecords();
+      const r = all.find(rec => rec.id === id);
+      if (!r) {
+        card.innerHTML = "<div class='panel'><h2>Record not found</h2></div>";
+        return;
+      }
+
+      const parent = r.forkedFrom ? all.find(x => x.id === r.forkedFrom) : null;
+      const children = all.filter(x => x.forkedFrom === r.id);
+      const photos = getPhotos(r.id);
+
+      const historyHtml = r.history.map(h => `<li>${h.date}: ${esc(h.action)}</li>`).join("");
+      const flagsHtml = r.flags.length
+        ? r.flags.map(f => `<li>🚩 ${f.date}: ${esc(f.reason)}${f.note ? " — " + esc(f.note) : ""}</li>`).join("")
+        : "<li>No flags yet</li>";
+      const banner = r.flags.length
+        ? `<div class="flag-banner">🚩 Flagged ${r.flags.length} time(s). Flags are reports for review, not rulings.</div>`
+        : "";
+
+      /* lineage */
+      const parentHtml = parent
+        ? `<li>🌳 Forked from <a href="credit.html?id=${parent.id}">${esc(parent.title)}</a> (${parent.id}) ·
+             <a href="compare.html?a=${parent.id}&b=${r.id}">See what changed</a></li>`
+        : "<li>Original record (not a fork)</li>";
+      const childrenHtml = children.map(c =>
+        `<li>↳ Fork: <a href="credit.html?id=${c.id}">${esc(c.title)}</a> by ${esc(c.creator)} ·
+           <a href="compare.html?a=${r.id}&b=${c.id}">Compare</a></li>`
+      ).join("");
+
+      /* memories gallery */
+      const galleryHtml = photos.length
+        ? `<div class="gallery">${photos.map((p, i) => `
+            <figure>
+              <img class="photo" src="${p.src}" alt="${esc(p.caption)}" data-i="${i}">
+              <figcaption>${esc(p.caption)}<small>Photo credit: ${esc(p.credit)} · ${p.date}</small></figcaption>
+            </figure>`).join("")}</div>`
+        : "<p class='hint'>No memories yet. Add the first photo below.</p>";
+
+      const photoBox = photos.length >= MAX_PHOTOS
+        ? `<div class="note">This record has the maximum of ${MAX_PHOTOS} photos.</div>`
+        : `<div class="flag-box">
+            <b>📸 Add a memory</b>
+            <p class="hint">Only upload photos you took or have permission to share. Photos of people should be shared with their consent.</p>
+            <input type="file" id="photo-file" accept="image/*">
+            <input id="photo-caption" placeholder="Caption (what is this memory?)">
+            <input id="photo-credit" placeholder="Photo credit (who took it?)">
+            <button id="photo-btn">Add photo</button>
+          </div>`;
+
+      /* fork box: a fork can never be MORE permissive than its parent */
+      const parentRank = Math.max(0, PERMISSIONS.indexOf(r.reusePermission));
+      const allowed = PERMISSIONS.filter((p, i) => i >= parentRank);
+      const optionsHtml = allowed.map(p => `<option>${p}</option>`).join("");
+
+      const forkBox = r.reusePermission === "Do not reuse"
+        ? `<div class="note">🔒 The creator marked this record "Do not reuse", so it can't be forked.</div>`
+        : `<div class="flag-box fork-box">
+            <b>🌳 Fork this record</b>
+            <p class="hint">Make your own version. The original stays credited, and every change is tracked.
+              Your version can't be more permissive than the original.</p>
+            ${r.reusePermission === "Ask the community first"
+              ? `<p class="hint">⚠️ The creator asks you to get the community's permission first. Confirm you have it before forking.</p>` : ""}
+            <input id="fork-title" placeholder="Title of your version">
+            <input id="fork-creator" placeholder="Your name (creator of this version)">
+            <input id="fork-region" placeholder="Region or community of your version">
+            <textarea id="fork-context" rows="3" placeholder="Cultural context">${esc(r.culturalContext)}</textarea>
+            <select id="fork-reuse">${optionsHtml}</select>
+            <button id="fork-btn">Create fork</button>
+          </div>`;
+
+      card.innerHTML = `
+        <div class="certificate">
+          ${banner}
+          <div class="orn">✦ ✦ ✦</div>
+          <h1>${esc(r.title)}</h1>
+          <p class="sub">Provenance &amp; Credit Record · ${r.id}</p>
+          <div class="rows">
+            <div class="row"><b>Creator</b>${esc(r.creator)}</div>
+            <div class="row"><b>Source</b>${esc(r.source)}</div>
+            <div class="row"><b>Region</b>${esc(r.region)}</div>
+            <div class="row"><b>Cultural context</b>${esc(r.culturalContext)}</div>
+            <div class="row"><b>Reuse permission</b>${esc(r.reusePermission)}</div>
+            <div class="row"><b>How to credit</b>${esc(r.attributionText)}</div>
+            <div class="row"><b>Created</b>${r.createdDate}</div>
+          </div>
+
+          <h3>Memories</h3>
+          ${galleryHtml}
+          ${photoBox}
+
+          <h3>Lineage</h3>
+          <ul class="timeline">${parentHtml}${childrenHtml}</ul>
+
+          <h3>History</h3>
+          <ul class="timeline">${historyHtml}</ul>
+
+          <h3>Flags</h3>
+          <ul class="timeline">${flagsHtml}</ul>
+
+          ${forkBox}
+
+          <div class="flag-box">
+            <b>Report a problem</b>
+            <select id="flag-reason">
+              <option>Missing attribution</option>
+              <option>Possible unauthorised reuse</option>
+              <option>Incorrect information</option>
+            </select>
+            <input id="flag-note" placeholder="Optional note">
+            <button id="flag-btn">Flag this record</button>
+          </div>
+
+          <div class="note">⚠️ This record states who says they created it. It does not prove legal ownership.</div>
+          <button id="copy">Copy link</button>
+          <button id="download">Download record</button>
+        </div>`;
+
+      /* enlarge photos */
+      document.querySelectorAll(".photo").forEach(img => {
+        img.addEventListener("click", () => {
+          const p = photos[Number(img.dataset.i)];
+          lightbox.innerHTML = `<img src="${p.src}" alt="${esc(p.caption)}">
+            <p>${esc(p.caption)} · Photo credit: ${esc(p.credit)}</p>`;
+          lightbox.classList.add("open");
+        });
+      });
+
+      /* add photo */
+      const photoBtn = document.getElementById("photo-btn");
+      if (photoBtn) {
+        photoBtn.addEventListener("click", async () => {
+          const file = document.getElementById("photo-file").files[0];
+          const caption = document.getElementById("photo-caption").value.trim();
+          const credit = document.getElementById("photo-credit").value.trim() || "Not stated";
+
+          if (!file) {
+            alert("Please choose a photo first.");
+            return;
+          }
+          if (!caption) {
+            alert("Please add a short caption.");
+            return;
+          }
+
+          try {
+            const src = await compressImage(file);
+            const d = todayStr();
+            const err = addPhoto(r.id, { src: src, caption: caption, credit: credit, date: d });
+            if (err) {
+              alert(err);
+              return;
+            }
+            saveEdit(r.id, { history: [...r.history, { date: d, action: "Photo added (credit: " + credit + ")" }] });
+            render();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+      }
+
+      /* create fork */
+      const forkBtn = document.getElementById("fork-btn");
+      if (forkBtn) {
+        document.getElementById("fork-title").value = r.title + " (variant)";
+        forkBtn.addEventListener("click", () => {
+          const title = document.getElementById("fork-title").value.trim();
+          const creator = document.getElementById("fork-creator").value.trim();
+          const region = document.getElementById("fork-region").value.trim();
+          const context = document.getElementById("fork-context").value.trim();
+          const reuse = document.getElementById("fork-reuse").value;
+
+          if (!title || !creator) {
+            alert("Title and your name are required.");
+            return;
+          }
+
+          const d = todayStr();
+          const fork = {
+            id: nextId(),
+            title: title,
+            creator: creator,
+            source: "Fork of " + r.id + " (" + r.title + ")",
+            region: region,
+            culturalContext: context,
+            reusePermission: reuse,
+            attributionText: "Credit: " + creator + (region ? ", " + region : "") +
+              ". Adapted from " + r.title + " by " + r.creator + " (" + r.id + ").",
+            createdDate: d,
+            forkedFrom: r.id,
+            flags: [],
+            history: [{ date: d, action: "Forked from " + r.id }]
+          };
+
+          addRecord(fork);
+          saveEdit(r.id, { history: [...r.history, { date: d, action: "Forked as " + fork.id }] });
+          location.href = "credit.html?id=" + fork.id;
+        });
+      }
+
+      /* flag */
+      document.getElementById("flag-btn").addEventListener("click", () => {
+        const d = todayStr();
+        const reason = document.getElementById("flag-reason").value;
+        const note = document.getElementById("flag-note").value.trim();
+        saveEdit(r.id, {
+          flags: [...r.flags, { date: d, reason: reason, note: note }],
+          history: [...r.history, { date: d, action: "Flagged: " + reason }]
+        });
+        render();
+      });
+
+      document.getElementById("copy").addEventListener("click", () => {
+        navigator.clipboard.writeText(location.href);
+        alert("Link copied!");
+      });
+
+      document.getElementById("download").addEventListener("click", () => {
+        const text =
+`PROVENANCE RECORD
+ID: ${r.id}
+Title: ${r.title}
+Creator: ${r.creator}
+Source: ${r.source}
+Region: ${r.region}
+Context: ${r.culturalContext}
+Reuse permission: ${r.reusePermission}
+How to credit: ${r.attributionText}
+Created: ${r.createdDate}
+Forked from: ${r.forkedFrom || "None (original record)"}
+Photos: ${photos.length}${photos.map(p => "\n  - " + p.caption + " (photo credit: " + p.credit + ")").join("")}
+Flags: ${r.flags.length}
+
+Note: This record states who says they created it. It does not prove legal ownership.`;
+        const blob = new Blob([text], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = r.id + "-credit-card.txt";
+        a.click();
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>
