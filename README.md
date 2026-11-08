@@ -86,26 +86,7 @@ data.js        The 12 sample records
 style.css      Shared styles and animations
 ```
 
-## Run it locally
-
-No install needed.
-
-1. Download or clone the repository
-2. Open `index.html` in a browser (or use the VS Code "Live Server" extension for auto-refresh)
-
-## Known limitations
-
-- **Data is stored per browser** (`localStorage`). Records, flags and photos you add on one device will not appear on another. The 12 sample records are shared because they ship with the code.
-- Browsers allow roughly 5 MB of local storage, so photos are compressed and limited to 6 per record.
-- There are no user accounts, so contributor names are self-declared.
-
-## What's next
-
-- A real database and user accounts
-- A reviewer workflow to approve, correct or remove entries
-- Community verification of creator claims
-- Audio and video memories
 
 ## Credits
 
-Built by the Shakha team for **ART//CODE 2026**, organised by DELTA.
+Built by Shrish and Sanju Baiju for **ART//CODE 2026**, organised by DELTA.
